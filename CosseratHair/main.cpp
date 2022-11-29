@@ -67,6 +67,7 @@ struct Segment {
 struct Curve {
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> color;
+    std::vector<Segment> segments;
 };
 
 void processInput(GLFWwindow* window)
@@ -136,9 +137,19 @@ int main() {
         float angle = i * 2 * PI / (256.0f / rings);
         float x = glm::cos(angle);
         float y = glm::sin(angle);
-        float z = i * 0.01f;
-        curve.vertices.push_back(glm::vec3(x, y, z));
+        float z = 5.0f - i * 0.01f;
+        Segment s{};
+        s.n1.p = glm::vec3(x, y, z);
+        angle = (i + 1) * 2 * PI / (256.0f / rings);
+        x = glm::cos(angle);
+        y = glm::sin(angle);
+        z = 5.0f - (i + 1) * 0.01f;
+        s.n2.p = glm::vec3(x, y, z);
+        curve.segments.push_back(s);
+        curve.vertices.push_back(s.n1.p);
     }
+    
+
     unsigned int vao, vbo_pos, vbo_col;
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo_pos);
@@ -161,13 +172,21 @@ int main() {
     unsigned int VAO_plane;
     glGenVertexArrays(1, &VAO_plane);
 
-    float planeVertices[] = {
-        10.0f,10.0f,0.0f,
-        -10.0f,10.0f,0.0f,
-        -10.0f,-10.0f,0.0f,
-        -10.0f,-10.0f,0.0f,
-        10.0f,-10.0f,0.0f,
-        10.0f,10.0f,0.0f
+    float axisVertices[] = {
+        0.0f,0.0f,0.0f,
+        0.0f,0.0f,1.0f,
+        0.0f,0.0f,1.0f,
+        0.0f,0.0f,1.0f,
+
+        0.0f,0.0f,0.0f,
+        0.0f,1.0f,0.0f,
+        0.0f,1.0f,0.0f,
+        0.0f,1.0f,0.0f,
+
+        0.0f,0.0f,0.0f,
+        1.0f,0.0f,0.0f,
+        1.0f,0.0f,0.0f,
+        1.0f,0.0f,0.0f
     };
 
     unsigned int VBO_pos_p;
@@ -176,12 +195,49 @@ int main() {
     glBindVertexArray(VAO_plane);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO_pos_p);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices[0], GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(axisVertices), &axisVertices[0], GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    
+    std::vector<glm::vec3> gridVertices;
+    glm::vec3 orig = glm::vec3(-4.0f, -4.0f, 0.0f);
+    for (int i = 0; i < 64; i++) {
+        glm::vec3 p1(i % 8, i / 8, 0.0f);
+        glm::vec3 p2(i % 8 + 1, i / 8, 0.0f);
+        glm::vec3 p3(i % 8, i / 8 + 1, 0.0f);
+        glm::vec3 p4(i % 8 + 1, i / 8 + 1, 0.0f);
+
+        gridVertices.push_back(orig + p1);
+        gridVertices.push_back(orig + p2);
+
+        gridVertices.push_back(orig + p1);
+        gridVertices.push_back(orig + p3);
+
+        gridVertices.push_back(orig + p2);
+        gridVertices.push_back(orig + p4);
+
+        gridVertices.push_back(orig + p3);
+        gridVertices.push_back(orig + p4);
+    }
+
+    unsigned int VAO_grid;
+    glGenVertexArrays(1, &VAO_grid);
+
+    unsigned int VBO_grid;
+    glGenBuffers(1, &VBO_grid);
+
+    glBindVertexArray(VAO_grid);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_grid);
+    glBufferData(GL_ARRAY_BUFFER, gridVertices.size() * 3 * sizeof(float), &gridVertices[0], GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     int width, height;
-    Shader shader = Shader("C:\\Src\\shaders\\vert_flat.glsl", "C:\\Src\\shaders\\frag_flat.glsl");
+    Shader shader = Shader("C:\\Src\\shaders\\vertCoss.glsl", "C:\\Src\\shaders\\fragCoss.glsl");
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -245,7 +301,10 @@ int main() {
         shader.setVec3("lightPos", lightPos);
         glBindVertexArray(vao);
         glDrawArrays(GL_LINE_STRIP, 0, curve.vertices.size());
-
+        glBindVertexArray(VAO_plane);
+        glDrawArrays(GL_LINES, 0, 12);
+        glBindVertexArray(VAO_grid);
+        glDrawArrays(GL_LINES, 0, gridVertices.size());
         //start of imgui init stuff
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
